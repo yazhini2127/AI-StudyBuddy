@@ -46,7 +46,10 @@ router.post('/', protect, async (req, res) => {
 
 // Upload study material file
 router.post('/upload', protect, upload.single('file'), async (req, res) => {
-  try {
+  console.log('BODY:', req.body);
+  console.log('FILE:', req.file);
+try {
+    
     const { title, subject } = req.body;
 
     if (!title || !subject || !req.file) {

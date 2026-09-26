@@ -1,4 +1,5 @@
-const { generateStudyMaterialSummary } = require('../services/aiService');const { generateSummary } = require('../services/aiService');
+const StudyMaterial = require('../models/StudyMaterial');
+const { generateStudyMaterialSummary } = require('../services/aiService');
 
 const summarizeMaterial = async (req, res) => {
   try {
@@ -40,7 +41,7 @@ const summarizeMaterial = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Summarize material error:', error.message);
+    console.error('Summarize material error:', error);
 
     return res.status(500).json({
       success: false,

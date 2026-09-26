@@ -1,187 +1,259 @@
-﻿const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
+const GEMINI_MODEL = 'gemini-3.8-flash';
 
+// ==========================
+// Local Weather Summary
+// ==========================
 const generateLocalSummary = (city, temperature, humidity, condition) => {
-  const tempWord = temperature >= 30 ? 'warm' : temperature <= 15 ? 'chilly' : 'pleasant';
-  const humidityWord = humidity >= 70 ? 'high' : humidity <= 40 ? 'low' : 'moderate';
+  const tempWord =
+    temperature >= 30
+      ? 'warm'
+      : temperature <= 15
+        ? 'chilly'
+        : 'pleasant';
+
+  const humidityWord =
+    humidity >= 70
+      ? 'high'
+      : humidity <= 40
+        ? 'low'
+        : 'moderate';
+
   return `Today's weather in ${city} is ${tempWord} and ${condition.toLowerCase()} with ${humidityWord} humidity.`;
 };
 
-const generateLocalRecommendation = (temperature, condition) => {
-  const recs = [];
-  const condLower = condition.toLowerCase();
+// ==========================
+// Local Weather Recommendation
+// ==========================
+const generateLocalRecommendation = (
+  city,
+  temperature,
+  humidity,
+  condition
+) => {
+  const recommendations = [];
 
   if (temperature >= 30) {
-    recs.push('stay hydrated');
-    recs.push('wear light cotton clothes');
-    if (condLower.includes('sunny') || condLower.includes('clear')) {
-      recs.push('avoid outdoor activities during peak afternoon hours');
-    }
+    recommendations.push('Stay hydrated and avoid excessive outdoor activity.');
   } else if (temperature <= 15) {
-    recs.push('wear warm layers');
-    recs.push('keep hot drinks nearby');
+    recommendations.push('Carry a light jacket and stay warm.');
   } else {
-    recs.push('enjoy the comfortable temperature');
-    recs.push('great day for outdoor plans');
+    recommendations.push('The temperature is comfortable for normal activities.');
   }
 
-  if (condLower.includes('rain') || condLower.includes('drizzle') || condLower.includes('thunderstorm')) {
-    recs.push('remember to carry an umbrella or raincoat');
-  } else if (condLower.includes('cloud') || condLower.includes('overcast')) {
-    recs.push('a light jacket might be handy');
-  } else if (condLower.includes('snow')) {
-    recs.push('watch out for slippery roads and stay warm');
+  if (humidity >= 70) {
+    recommendations.push('High humidity may make it feel warmer.');
   }
 
-  if (recs.length === 0) {
-    recs.push('dress comfortably for the current conditions');
+  if (condition.toLowerCase().includes('rain')) {
+    recommendations.push('Carry an umbrella and be careful on wet roads.');
   }
 
-  // Combine recommendations list into a sentence
-  const sentence = recs.slice(0, -1).join(', ') + (recs.length > 1 ? ', and ' : '') + recs.slice(-1);
-  return sentence.charAt(0).toUpperCase() + sentence.slice(1) + '.';
+  return recommendations.join(' ');
 };
 
-/**
- * Generate AI Summary
- */
-const generateSummary = async (city, temperature, humidity, condition) => {
+// ==========================
+// AI Helper
+// ==========================
+const getGeminiModel = () => {
   const apiKey = process.env.GEMINI_API_KEY;
 
-  if (!apiKey || apiKey === 'your_gemini_api_key' || apiKey.trim() === '') {
-    console.log('[AIService] Using rule-based fallback for weather summary (No Gemini key)');
-    return generateLocalSummary(city, temperature, humidity, condition);
+  if (
+    !apiKey ||
+    apiKey === 'your_gemini_api_key' ||
+    apiKey.trim() === ''
+  ) {
+    return null;
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+
+  return genAI.getGenerativeModel({
+    model: GEMINI_MODEL
+  });
+};
+
+// ==========================
+// Weather Summary
+// ==========================
+const generateSummary = async (
+  city,
+  temperature,
+  humidity,
+  condition
+) => {
+  const model = getGeminiModel();
+
+  if (!model) {
+    return generateLocalSummary(
+      city,
+      temperature,
+      humidity,
+      condition
+    );
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-    const prompt = `Generate a concise weather summary (maximum 1-2 sentences) for the following weather conditions:
-    City: ${city}
-    Temperature: ${temperature}Â°C
-    Humidity: ${humidity}%
-    Condition: ${condition}
-    
-    Response format should be simple, natural, and directly describe the current feel. Do not include markdown formatting.`;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text().trim();
-
-    return text || generateLocalSummary(city, temperature, humidity, condition);
-  } catch (error) {
-    console.error('[AIService] Gemini API error generating summary:', error.message);
-    return generateLocalSummary(city, temperature, humidity, condition);
-  }
-};
-
-/**
- * Generate AI Recommendation
- */
-const generateRecommendation = async (temperature, condition) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey || apiKey === 'your_gemini_api_key' || apiKey.trim() === '') {
-    console.log('[AIService] Using rule-based fallback for weather recommendation (No Gemini key)');
-    return generateLocalRecommendation(temperature, condition);
-  }
-
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-    const prompt = `Provide actionable personalized recommendations (maximum 1-2 sentences, e.g., clothing, hydration, activities) based on these weather conditions:
-    Temperature: ${temperature}Â°C
-    Condition: ${condition}
-    
-    Response format should be natural, friendly, and practical. Do not include markdown formatting.`;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text().trim();
-
-    return text || generateLocalRecommendation(temperature, condition);
-  } catch (error) {
-    console.error('[AIService] Gemini API error generating recommendation:', error.message);
-    return generateLocalRecommendation(temperature, condition);
-  }
-};
-/**
- * Generate AI Summary for Study Material
- */
-const generateStudyMaterialSummary = async (title, subject, content) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey || apiKey === 'your_gemini_api_key' || apiKey.trim() === '') {
-    console.log('[AIService] Gemini key not available for study material summary');
-    return `Summary for ${title}: ${content.substring(0, 300)}`;
-  }
-
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash'
-    });
-
     const prompt = `
-You are an AI StudyBuddy assistant.
+Give a short and simple weather summary for a student.
 
-Create a concise and easy-to-understand study summary.
+City: ${city}
+Temperature: ${temperature}°C
+Humidity: ${humidity}%
+Condition: ${condition}
 
-Title: ${title}
-Subject: ${subject}
-
-Study Material:
-${content}
-
-Requirements:
-- Summarize the important concepts.
-- Use simple language suitable for students.
-- Keep the summary concise.
-- Do not add information that is not present in the study material.
-- Do not use markdown formatting.
+Keep it under 3 sentences.
 `;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const text = response.text().trim();
 
-    return text || `Summary for ${title}: ${content.substring(0, 300)}`;
+    return response.text().trim();
   } catch (error) {
     console.error(
-      '[AIService] Gemini API error generating study material summary:',
+      '[AIService] Weather summary error:',
       error.message
     );
 
-    return `Summary for ${title}: ${content.substring(0, 300)}`;
+    return generateLocalSummary(
+      city,
+      temperature,
+      humidity,
+      condition
+    );
   }
 };
-/**
- * Generate AI Flashcards for Study Material
- */
-const generateFlashcards = async (title, subject, content) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'your_gemini_api_key' || apiKey.trim() === '') {
+
+// ==========================
+// Weather Recommendation
+// ==========================
+const generateRecommendation = async (
+  city,
+  temperature,
+  humidity,
+  condition
+) => {
+  const model = getGeminiModel();
+
+  if (!model) {
+    return generateLocalRecommendation(
+      city,
+      temperature,
+      humidity,
+      condition
+    );
+  }
+
+  try {
+    const prompt = `
+Give simple and practical weather recommendations for a student.
+
+City: ${city}
+Temperature: ${temperature}°C
+Humidity: ${humidity}%
+Condition: ${condition}
+
+Give 3 short recommendations.
+`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+
+    return response.text().trim();
+  } catch (error) {
+    console.error(
+      '[AIService] Weather recommendation error:',
+      error.message
+    );
+
+    return generateLocalRecommendation(
+      city,
+      temperature,
+      humidity,
+      condition
+    );
+  }
+};
+
+// ==========================
+// Study Material Summary
+// ==========================
+const generateStudyMaterialSummary = async (
+  title,
+  subject,
+  content
+) => {
+  const model = getGeminiModel();
+
+  if (!model) {
+    return `Summary of ${title}: ${content.substring(0, 500)}`;
+  }
+
+  try {
+    const prompt = `
+Create a clear and easy-to-understand study summary.
+
+Title: ${title}
+Subject: ${subject}
+
+Content:
+${content}
+
+Include:
+- Main concepts
+- Important points
+- Key terms
+
+Keep it suitable for a college student.
+`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+
+    return response.text().trim();
+  } catch (error) {
+    console.error(
+      '[AIService] Study material summary error:',
+      error.message
+    );
+
+    return `Summary of ${title}: ${content.substring(0, 500)}`;
+  }
+};
+
+// ==========================
+// Flashcards
+// ==========================
+const generateFlashcards = async (
+  title,
+  subject,
+  content
+) => {
+  const model = getGeminiModel();
+
+  if (!model) {
     return [
       {
         question: `What is ${title}?`,
-        answer: content.substring(0, 300)
+        answer: `It is a study material related to ${subject}.`
       }
     ];
   }
+
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash'
-    });
     const prompt = `
-Create exactly 5 study flashcards from this material.
+Create 5 useful flashcards from the following study material.
+
 Title: ${title}
 Subject: ${subject}
-Material:
+
+Content:
 ${content}
-Return ONLY valid JSON in this format:
+
+Return ONLY valid JSON.
+
+Format:
 [
   {
     "question": "Question",
@@ -189,34 +261,213 @@ Return ONLY valid JSON in this format:
   }
 ]
 `;
+
     const result = await model.generateContent(prompt);
     const response = await result.response;
+
     let text = response.text().trim();
+
     text = text
       .replace(/^```json\s*/i, '')
       .replace(/^```\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
-    const flashcards = JSON.parse(text);
-    if (!Array.isArray(flashcards)) {
-      throw new Error('Invalid flashcards format');
-    }
-    return flashcards;
+
+    return JSON.parse(text);
   } catch (error) {
-    console.error('[AIService] Flashcards error:', error.message);
+    console.error(
+      '[AIService] Flashcards error:',
+      error.message
+    );
+
     return [
       {
         question: `What is ${title}?`,
-        answer: content.substring(0, 300)
+        answer: `It is a study material related to ${subject}.`
       }
     ];
   }
-};module.exports = {
+};
+
+// ==========================
+// Quiz
+// ==========================
+const generateQuiz = async (
+  title,
+  subject,
+  content
+) => {
+  const model = getGeminiModel();
+
+  if (!model) {
+    return [
+      {
+        question: `What is the main topic of ${title}?`,
+        options: [
+          subject,
+          'History',
+          'Geography',
+          'General Knowledge'
+        ],
+        answer: subject
+      }
+    ];
+  }
+
+  try {
+    const prompt = `
+Create 5 multiple-choice quiz questions from this study material.
+
+Title: ${title}
+Subject: ${subject}
+
+Content:
+${content}
+
+Return ONLY valid JSON.
+
+Format:
+[
+  {
+    "question": "Question",
+    "options": [
+      "Option A",
+      "Option B",
+      "Option C",
+      "Option D"
+    ],
+    "answer": "Correct option"
+  }
+]
+`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+
+    let text = response.text().trim();
+
+    text = text
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+
+    return JSON.parse(text);
+  } catch (error) {
+    console.error(
+      '[AIService] Quiz error:',
+      error.message
+    );
+
+    return [
+      {
+        question: `What is the main topic of ${title}?`,
+        options: [
+          subject,
+          'History',
+          'Geography',
+          'General Knowledge'
+        ],
+        answer: subject
+      }
+    ];
+  }
+};
+
+// ==========================
+// Study Plan
+// ==========================
+const generateStudyPlan = async (
+  subject,
+  topics,
+  days
+) => {
+  const model = getGeminiModel();
+
+  // Local fallback if Gemini API is not available
+  if (!model) {
+    return topics.map((topic, index) => ({
+      day: index + 1,
+      topic,
+      tasks: [
+        `Study ${topic}`,
+        `Review important concepts from ${topic}`
+      ]
+    }));
+  }
+
+  try {
+    const prompt = `
+Create a simple day-by-day study plan for a college student.
+
+Subject: ${subject}
+
+Topics:
+${topics.join(', ')}
+
+Number of days: ${days}
+
+Create a plan covering all ${days} days.
+
+Return ONLY valid JSON.
+
+Format:
+[
+  {
+    "day": 1,
+    "topic": "Topic name",
+    "tasks": [
+      "Task 1",
+      "Task 2"
+    ]
+  }
+]
+`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+
+    let text = response.text().trim();
+
+    text = text
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+
+    const studyPlan = JSON.parse(text);
+
+    if (!Array.isArray(studyPlan)) {
+      throw new Error('Invalid study plan format');
+    }
+
+    return studyPlan;
+  } catch (error) {
+    console.error(
+      '[AIService] Study plan error:',
+      error.message
+    );
+
+    // Local fallback
+    return topics.map((topic, index) => ({
+      day: index + 1,
+      topic,
+      tasks: [
+        `Study ${topic}`,
+        `Review important concepts from ${topic}`
+      ]
+    }));
+  }
+};
+
+// ==========================
+// EXPORTS
+// ==========================
+module.exports = {
   generateSummary,
   generateRecommendation,
   generateStudyMaterialSummary,
-  generateFlashcards
+  generateFlashcards,
+  generateQuiz,
+  generateStudyPlan
 };
-
-
-

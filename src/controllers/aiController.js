@@ -1,20 +1,31 @@
 const {
   generateSummary,
   generateRecommendation,
-  generateFlashcards
+  generateFlashcards,
+  generateQuiz,
+  generateStudyPlan
 } = require('../services/aiService');
 
 const StudyMaterial = require('../models/StudyMaterial');
 
 
+// ==============================
+// Weather Summary
+// ==============================
 const getWeatherSummary = async (req, res) => {
   try {
     const { city, temperature, humidity, condition } = req.body;
 
-    if (!city || temperature === undefined || humidity === undefined || !condition) {
+    if (
+      !city ||
+      temperature === undefined ||
+      humidity === undefined ||
+      !condition
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide all fields: city, temperature, humidity, and condition'
+        message:
+          'Please provide all fields: city, temperature, humidity, and condition'
       });
     }
 
@@ -40,6 +51,9 @@ const getWeatherSummary = async (req, res) => {
 };
 
 
+// ==============================
+// Weather Recommendation
+// ==============================
 const getWeatherRecommendation = async (req, res) => {
   try {
     const { temperature, condition } = req.body;
@@ -47,7 +61,8 @@ const getWeatherRecommendation = async (req, res) => {
     if (temperature === undefined || !condition) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide all fields: temperature and condition'
+        message:
+          'Please provide all fields: temperature and condition'
       });
     }
 
@@ -61,20 +76,24 @@ const getWeatherRecommendation = async (req, res) => {
       recommendation
     });
   } catch (error) {
-    console.error('Error in getWeatherRecommendation:', error.message);
+    console.error(
+      'Error in getWeatherRecommendation:',
+      error.message
+    );
 
     return res.status(500).json({
       success: false,
-      message: 'Server error while generating weather recommendations'
+      message:
+        'Server error while generating weather recommendations'
     });
   }
 };
 
 
-/**
- * Generate AI Flashcards for Study Material
- * POST /api/ai/flashcards
- */
+// ==============================
+// Generate AI Flashcards
+// POST /api/ai/flashcards
+// ==============================
 const getFlashcards = async (req, res) => {
   try {
     const { materialId } = req.body;
@@ -101,7 +120,8 @@ const getFlashcards = async (req, res) => {
     if (!material.content || material.content.trim() === '') {
       return res.status(400).json({
         success: false,
-        message: 'This study material does not contain text content'
+        message:
+          'This study material does not contain text content'
       });
     }
 
@@ -122,18 +142,144 @@ const getFlashcards = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in getFlashcards:', error.message);
+    console.error(
+      'Error in getFlashcards:',
+      error.message
+    );
 
     return res.status(500).json({
       success: false,
-      message: 'Server error while generating flashcards'
+      message:
+        'Server error while generating flashcards'
     });
   }
 };
 
 
+// ==============================
+// Generate AI Quiz
+// POST /api/ai/quiz
+// ==============================
+const getQuiz = async (req, res) => {
+  try {
+    const { materialId } = req.body;
+
+    if (!materialId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide materialId'
+      });
+    }
+
+    const material = await StudyMaterial.findOne({
+      _id: materialId,
+      userId: req.user.id
+    });
+
+    if (!material) {
+      return res.status(404).json({
+        success: false,
+        message: 'Study material not found'
+      });
+    }
+
+    if (!material.content || material.content.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message:
+          'This study material does not contain text content'
+      });
+    }
+
+    const quiz = await generateQuiz(
+      material.title,
+      material.subject,
+      material.content
+    );
+
+    return res.json({
+      success: true,
+      message: 'Quiz generated successfully',
+      data: {
+        materialId: material._id,
+        title: material.title,
+        subject: material.subject,
+        quiz
+      }
+    });
+  } catch (error) {
+    console.error(
+      'Error in getQuiz:',
+      error.message
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        'Server error while generating quiz'
+    });
+  }
+};
+
+
+// ==============================
+// Generate AI Study Plan
+// POST /api/ai/study-plan
+// ==============================
+const getStudyPlan = async (req, res) => {
+  try {
+    const { subject, topics, days } = req.body;
+
+    if (
+      !subject ||
+      !Array.isArray(topics) ||
+      topics.length === 0 ||
+      !days
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Please provide subject, topics array, and days'
+      });
+    }
+
+    const studyPlan = await generateStudyPlan(
+      subject,
+      topics,
+      Number(days)
+    );
+
+    return res.json({
+      success: true,
+      message: 'Study plan generated successfully',
+      data: {
+        subject,
+        days: Number(days),
+        studyPlan
+      }
+    });
+  } catch (error) {
+    console.error(
+      'Error in getStudyPlan:',
+      error.message
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        'Server error while generating study plan'
+    });
+  }
+};
+
+
+// ==============================
+// Exports
+// ==============================
 module.exports = {
   getWeatherSummary,
   getWeatherRecommendation,
-  getFlashcards
+  getFlashcards,
+  getQuiz,
+  getStudyPlan
 };
