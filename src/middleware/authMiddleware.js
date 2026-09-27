@@ -11,7 +11,7 @@ const protect = async (req, res, next) => {
     try {
       // Extract the token
       token = req.headers.authorization.split(' ')[1];
-
+      console.log('TOKEN RECEIVED:', token);
       // Decode and verify the token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_super_secret_jwt_key_12345!');
 
